@@ -1,4 +1,4 @@
-# FormAnalysis
+# FormCheck
 
 Spec and design docs for **FormCheck** — an iOS app providing asynchronous form feedback on bodybuilding exercise execution and posing, replacing a week-long coach feedback loop with ~60-second turnaround while preserving (and learning from) the coaching relationship.
 
