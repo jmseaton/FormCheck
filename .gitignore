@@ -1,0 +1,13 @@
+# Calibration corpus — personal video + coach communications (see spec §7.5.4, §9)
+# Never commit raw corpus media or feedback to a shareable repo.
+coach-history/
+
+# OS / editor noise
+.DS_Store
+*.swp
+
+# Xcode (for when the app project lands here)
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
