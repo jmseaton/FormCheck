@@ -24,7 +24,7 @@ The Stage B kinematics package is consumed by BOTH the iOS app and the dev eval 
 ## Repo layout (current & planned)
 
 - `formcheck-spec.md` — the spec; versioned via git history
-- `coach-history/` — (gitignored, local only) calibration corpus per spec §7.5.4: per-exercise dirs of (video + verbatim feedback) pairs + `manifest.csv` (date, exercise, video, feedback, outcome)
+- `coach-history/` — (gitignored, local only) calibration corpus per spec §7.5.4: per-exercise dirs of (video + verbatim feedback) pairs + `manifest.csv` (`date, exercise, video, feedback, outcome, resolves`; outcome vocabulary `open|y|partial|n|regressed|n/a` — see spec §7.5.4 for semantics; `exercise` values must match directory names exactly, as they join to ExerciseDefs later)
 - planned: `Kinematics/` (Swift package), `Harness/` (eval CLI), `App/` (iOS app), `ExerciseDefs/` (Layer 1 JSON)
 
 ## Current status / next milestone

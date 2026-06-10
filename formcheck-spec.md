@@ -1,10 +1,12 @@
 # FormCheck — Product & Engineering Spec
 
-**Version:** 0.2 (Draft)
+**Version:** 0.3 (Draft)
 **Date:** 2026-06-10
 **Owner:** Jared
 **Status:** Draft for review
-**Changelog:** 0.2 — added reference provenance & two-layer calibration model (§7.5), coach feedback attachment (§6.4), user overlay + anthropometric parameterization in data model (§8), calibration corpus workflow in milestones (§10), resolved Q1.
+**Changelog:**
+- 0.3 — formalized corpus manifest schema: `resolves` chain column, full outcome vocabulary incl. `regressed` (§7.5.4); added `regressed` to cue lifecycle and single-event resolve+open handling (§6.4, §8).
+- 0.2 — added reference provenance & two-layer calibration model (§7.5), coach feedback attachment (§6.4), user overlay + anthropometric parameterization in data model (§8), calibration corpus workflow in milestones (§10), resolved Q1.
 
 ---
 
@@ -81,7 +83,7 @@ US-9 + US-10 are the v1 bridge to coaching; they keep the coach relationship int
 - Library organized by exercise/pose, filterable by date.
 - Side-by-side synced playback (sync on rep start, not wall-clock).
 - Photo A-B overlay slider for posing.
-- **Cue tracking:** when feedback issues a cue, it persists as an open item on that exercise; subsequent analyses evaluate it explicitly and mark resolved/persisting. This is the close-the-loop mechanic and the app's differentiator.
+- **Cue tracking:** when feedback issues a cue, it persists as an open item on that exercise; subsequent analyses evaluate it explicitly and mark resolved/persisting. Resolved cues remain under evaluation at lower priority: if the fault reappears (typically under heavier loads or fatigue), the cue transitions to **regressed** and reopens — a distinct, expected lifecycle event, not an error. A single piece of feedback may simultaneously resolve one cue and open another ("good progress on X, now tweak Y"); the system must handle this as one event, since chained cue → progress + refinement is the dominant coaching pattern. This is the close-the-loop mechanic and the app's differentiator.
 - **Coach feedback attachment (US-10):** after a check-in, the user attaches the coach's feedback (text; voice memo transcribed on-device) to the specific submission reviewed. Verbatim capture is encouraged over paraphrase — it preserves cue vocabulary. Attached feedback:
   1. Becomes a labeled example, exportable to the calibration corpus (§7.5.4).
   2. Can open or resolve cues with coach authority (distinct from app-inferred status).
@@ -149,9 +151,23 @@ Form standards are authored content, not a given. The reference architecture is 
     2026-03-14.mov
     2026-03-14_feedback.txt      # verbatim coach comments
   /rdl/ ...
-  manifest.csv  # date, exercise, video, feedback, outcome (cue later resolved? y/n/partial)
+  manifest.csv
 ```
-- The `outcome` column identifies before/after pairs for the same fault — the validation set for the cue-tracking mechanic itself.
+- **Manifest schema:** `date, exercise, video, feedback, outcome, resolves`
+  - `date` — ISO 8601 (sorts chronologically as plain text)
+  - `exercise` — must exactly match the per-exercise directory name; this value is the join key to the exercise definition JSON in M1+, so consistency here avoids a mapping table later
+  - `video`, `feedback` — paths relative to `coach-history/`
+  - `outcome` — the fate of the cue issued **in this row's feedback**, judged by later evidence. It does *not* describe whether this video showed progress on an earlier cue (that is recorded by updating the earlier row). Vocabulary:
+    - `open` — cue issued, no later evidence yet
+    - `y` — later footage confirms the cue resolved
+    - `partial` — incorporated incompletely (e.g., holds early reps, breaks down under fatigue)
+    - `n` — attempted but never stuck
+    - `regressed` — resolved, then reappeared later (typically under heavier loads or fatigue)
+    - `n/a` — negative example: coach reviewed and flagged nothing; no cue to track
+  - `resolves` — optional; date of the earlier row whose cue this video is evidence for. Makes before/after chains machine-readable instead of inferred from chronology.
+- **Chain semantics:** typical coaching feedback is "good progress on X, now tweak Y" — a single check-in that simultaneously closes one cue and opens another. This is one manifest row: `resolves` points back at the prior row (whose `outcome` gets updated to `y`/`partial`), and this row's own new cue starts at `open`. Chains of cue → progress + refinement are the common case, not the exception.
+- The `outcome`/`resolves` chains identify before/after pairs for the same fault — the validation set for the cue-tracking mechanic itself. `regressed` rows are distinct, high-value test cases: can the pipeline re-detect a fault it previously marked resolved?
+- **Feedback hygiene:** when one coach message covers multiple exercises, split it into the per-exercise feedback files rather than duplicating the whole message — Stage C prompts are built per-exercise, and cross-contaminated feedback files corrupt the eval. Verbatim capture over paraphrase throughout.
 - Target composition: 5–10 pairs per major lift, deliberately mixing flagged sets and "looked good" sets (negative examples gate the false-positive metric). Posing photo + critique pairs included on the same pattern.
 - **Dev harness:** CLI (or notebook) wrapping the same Swift kinematics package as the device. Runs corpus videos through Stages A–B, compares metrics against coach labels, reports agreement/false-positive rates per exercise.
 - **Calibration loop (deliberate, human-in-the-middle):** new labeled pairs accumulate in-app → periodically exported to corpus → thresholds/prompts re-tuned offline → full eval re-run → updated overlay (or Layer 1, with its own gate) shipped. The app never self-adjusts; every change is testable and reversible.
@@ -181,7 +197,9 @@ CoachFeedback(id, submissionId, verbatimText, audioRef,
               exportedToCorpus bool)
 AccuracyMark(id, analysisId, verdict: accurate|off_base, note)
 Cue(id, userId, exerciseId, text, sourceType: app|coach,
-    sourceRef, status: open|resolved|persisting,
+    sourceRef, status: open|resolved|persisting|regressed,
+    resolvesCueId,                                     -- chain: cue opened by the
+                                                       --   feedback that closed this one
     resolvedBy: app|coach)
 ```
 
