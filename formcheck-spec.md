@@ -1,10 +1,11 @@
 # FormCheck — Product & Engineering Spec
 
-**Version:** 0.3 (Draft)
-**Date:** 2026-06-10
+**Version:** 0.4 (Draft)
+**Date:** 2026-06-11
 **Owner:** Jared
 **Status:** Draft for review
 **Changelog:**
+- 0.4 — capture requirements for pose quality (intrinsics delivery, 1× lens, framing margin, stabilization, flicker check — §6.1); Q2 proposed resolution: hybrid 2D full-rate + 3D keyframes strategy (§6.2 Stage A, §12 Q2).
 - 0.3 — formalized corpus manifest schema: `resolves` chain column, full outcome vocabulary incl. `regressed` (§7.5.4); added `regressed` to cue lifecycle and single-event resolve+open handling (§6.4, §8).
 - 0.2 — added reference provenance & two-layer calibration model (§7.5), coach feedback attachment (§6.4), user overlay + anthropometric parameterization in data model (§8), calibration corpus workflow in milestones (§10), resolved Q1.
 
@@ -60,14 +61,20 @@ US-9 + US-10 are the v1 bridge to coaching; they keep the coach relationship int
 ## 6. Functional Requirements
 
 ### 6.1 Capture & Import
-- In-app camera: 1080p/60fps default (60fps materially improves pose tracking on fast concentrics), landscape and portrait supported, optional countdown timer and auto-stop after N seconds.
+- In-app camera: 1080p/60fps default (60fps materially improves pose tracking on fast concentrics; 4K adds storage/processing cost with no pose-accuracy benefit since Vision downscales internally), landscape and portrait supported, optional countdown timer and auto-stop after N seconds.
+- **Capture requirements (pose-quality, configured once — not per-session settings):**
+  - Enable camera intrinsic matrix delivery on the capture connection (`isCameraIntrinsicMatrixDeliveryEnabled`); intrinsics improve 3D pose projection geometry at zero cost. Note: imported Photos videos lack intrinsics — a quality argument for in-app recording as the primary path.
+  - Main 1× lens only — never ultra-wide (edge distortion corrupts 2D angles and 3D projection assumptions) or digital zoom. Prefer physical distance over wider lens.
+  - Whole body in frame with margin at full extension; joints exiting frame destabilize the entire skeleton estimate. Ghost-overlay presets enforce this and must be set with the lifter at full extension, not standing relaxed.
+  - Stabilization off (or standard at most) for fixed mounts; aggressive crop modes (e.g., Action mode) dynamically alter effective focal length, invalidating intrinsics and eating frame margin.
+  - Validate garage lighting for LED flicker/banding at 60fps during M1; banding manifests as frame-to-frame pose jitter.
 - Import from Photos library (video and stills).
 - Exercise tagging at capture or import time: searchable exercise list seeded with the user's actual movements (belt squat, RDL, Nordic curl, Smith machine variants, pulley work, etc.) plus standard barbell/dumbbell lifts. Exercises carry metadata: movement pattern, camera angle guidance, key checkpoints.
 - Posing mode: pose tagging from the standard mandatory poses (front double biceps, front lat spread, side chest, side triceps, rear double biceps, rear lat spread, abs & thighs, most muscular) plus free-form.
 - Camera-angle guidance per exercise (e.g., "squat: 45° front-oblique or true side") shown as a ghost overlay; fixed garage-gym camera positions can be saved as presets.
 
 ### 6.2 Analysis Pipeline (see §7 for architecture)
-- **Stage A — Pose extraction (on-device):** Vision framework body-pose detection on every frame (or every other frame at 60fps). Output: time series of joint positions, confidence scores.
+- **Stage A — Pose extraction (on-device):** hybrid 2D/3D strategy (proposed resolution to Q2, validated in M1). 2D (`VNDetectHumanBodyPoseRequest`) runs at full frame rate for rep segmentation, tempo, and trajectory — image-plane measurements where 2D is reliable. 3D (`VNDetectHumanBodyPose3DRequest`, iOS 17+) runs only on checkpoint keyframes (rep bottom, lockout, flagged anomalies; ~10–20 frames/set) where true joint angles are required — 2D angles from oblique camera positions are foreshortened by a rep-phase-varying, non-calibratable error, while 3D recovers angles in body space independent of camera placement. 3D also yields segment lengths in meters, feeding the anthropometric parameterization (§7.5.1) with true ratios rather than foreshortened image-plane ratios. Output: 2D time series of joint positions + confidence at full rate; 3D joint positions on keyframes.
 - **Stage B — Kinematic computation (on-device):** rep segmentation, per-rep metrics: joint angles at key positions (e.g., hip/knee/ankle at squat bottom), ROM, eccentric/concentric tempo, bar/implement path approximation (wrist or tracked-point trajectory), left/right asymmetry, inter-rep consistency drift (fatigue signal). Checkpoint resolution = generic baseline def + user overlay (§7.5), with anthropometric parameters computed from the user's own pose data.
 - **Stage C — Qualitative feedback (cloud LLM vision):** selected keyframes (rep bottom, sticking point, lockout, plus any frames flagged anomalous by Stage B) + Stage B metrics + resolved exercise definition + open cue list + user's "feel" note → structured coaching feedback. Posing path: keyframes/photos + symmetry/alignment metrics → per-pose critique. Prompt context includes the user's calibration overlay (cue vocabulary, prioritization) when present.
 - Feedback output is structured: per-rep observations, set-level summary, 1–3 prioritized cues (never a wall of ten corrections), severity-ranked, with frame references so each observation is tappable → jumps to the frame.
@@ -244,6 +251,6 @@ Notes:
 | R5 | Baseline contamination: personal calibration leaking into Layer 1 | Two-layer model + separate eval gates (§7.5.5); Layer 1 changes require multi-source evidence |
 | R6 | Overlay overfit: coach corpus tunes the owner's overlay so tightly that legitimate technique variation gets flagged | Keep overlay deltas provenance-linked; discrepancy flags surface overcorrection |
 | ~~Q1~~ | ~~Does coach feedback history exist in exportable form?~~ **Resolved: yes.** Historical (video + feedback) pairs exist → M0 corpus assembly added | Verbatim transcripts preferred over paraphrase |
-| Q2 | 2D vs 3D pose request: 3D improves sagittal angles but device/perf constraints apply | Benchmark in M1 |
+| Q2 | 2D vs 3D pose: **proposed resolution — hybrid** (2D full-rate for segmentation/tempo/trajectory; 3D on checkpoint keyframes only for true angles; see §6.2 Stage A). 3D keyframe cost is ~10–20 frames/set, negligible in the §7.4 budget | M1 benchmark validates: (a) 3D angle accuracy vs known reference (goniometer/fixed-angle jig on film), (b) 3D keyframe latency on target device, (c) whether 2D from fixed presets suffices with per-preset correction (fixed geometry makes foreshortening constant per exercise) |
 | Q3 | iOS minimum version / device floor (affects 3D pose availability) | Propose iOS 17+, A15+ |
 | Q4 | Anthropometric parameterization functions: which thresholds vary with leverage, and what's the functional form? | Derive candidates from biomechanics literature in M1; validate against owner corpus (tall-lifter data point) |
