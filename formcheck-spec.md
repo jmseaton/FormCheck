@@ -13,9 +13,9 @@
 
 ## 1. Problem Statement
 
-Remote bodybuilding coaching operates on a weekly feedback loop. Exercise execution and posing videos are recorded during the week, reviewed at check-in, and feedback arrives days after the rep was performed. By then, the proprioceptive memory of the lift is gone — it's difficult to connect "what it felt like" to "what the coach saw," and equally difficult to verify that incorporated feedback actually changed the movement.
+Remote bodybuilding coaching operates on a weekly feedback loop. Exercise execution and posing videos are recorded during the week, reviewed at check-in, and feedback arrives days after the rep was performed. By then, the proprioceptive memory of the lift is gone. It's difficult to connect "what it felt like" to "what the coach saw," and equally difficult to verify that incorporated feedback actually changed the movement.
 
-**Core insight:** the value isn't just faster feedback — it's feedback delivered while the kinesthetic memory is still fresh, plus an objective record that closes the loop between coach cue → attempted correction → verified change.
+**Core insight:** the value isn't just faster feedback, it's feedback delivered while the kinesthetic memory is still fresh, plus an objective record that closes the loop between coach cue → attempted correction → verified change.
 
 ## 2. Goals
 
